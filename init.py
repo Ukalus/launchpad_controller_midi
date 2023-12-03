@@ -3,8 +3,8 @@ import rtmidi
 import logging
 import sys
 import time
-import http.server 
 import requests
+import json
 
 midi_to_coords = {
     "104": "MOVE",
@@ -18,14 +18,19 @@ midi_to_coords = {
 
 class Command:
     type = "MOVE"
-    coords = [] 
-    def __init__(self,type: str):
+    coords = [0,0] 
+    def __init__(self,type: str, coords: []):
         self.type = type
+        self.coords = coords
+
+    def toJSON(self):
+        return json.dumps(self, default=lambda o: o.__dict__, 
+            sort_keys=True, indent=4)
 
 
 class LaunchpadAPI:
 
-    endpoint_url = "http://localhost:5533"
+    endpoint_url = "http://127.0.0.1:5000"
     midi_out: rtmidi.MidiOut
     midi_in: rtmidi.MidiIn
     midi_out_port: int = 0
@@ -50,7 +55,7 @@ class LaunchpadAPI:
             self.midi_in, self.midi_in_port = open_midiinput(self.midi_out_port)
         except (EOFError, KeyboardInterrupt):
             sys.exit()
-        self.command = Command("MOVE")
+        self.command = Command("MOVE",[0,0])
     def run(self):
         
         print("Entering main loop. Press Control-C to exit.")
@@ -64,10 +69,13 @@ class LaunchpadAPI:
             del self.midi_in
     def send_command(self):
         try:
-            r = requests.post(endpoint_url, self.command)
+            header = {'Content-Type': 'application/json'}
+            r = requests.post(url=self.endpoint_url, data=self.command.toJSON(), headers=header)
             print(f"Robot responded: {r.text}")
+            return 0
         except:
             print(f"ERROR: couldn't reach robot endpoint. ({self.endpoint_url})")
+            return 0
     def handle_input(self):
         timer = time.time()
         while True:
@@ -86,7 +94,7 @@ class LaunchpadAPI:
                             self.command.coords= midi_to_coords[str(message[1])] 
                             print(f"sending command to robot...")
                             print(f"{self.command.type} to {self.command.coords}")
-                            self.send_coordinates()
+                            self.send_command()
                     except:
                         print("Key not mapped")
                   
